@@ -18,12 +18,12 @@ var PgCmdTest2 = &cobra.Command{
 		TestClientFuncs()
 		klog.Info("\n========================\n")
 
-		klog.Info("Testing 'TestSharedBuffers()':\n")
-		TestSharedBuffers()
+		klog.Info("Testing 'TestCheckAvailableSharedBuffers()':\n")
+		TestCheckAvailableSharedBuffers()
 		klog.Info("\n========================\n")
 
-		klog.Info("Testing 'TestGetMaxAllowedMemory()':\n")
-		TestGetMaxAllowedMemory()
+		klog.Info("Testing 'TestCheckEffectiveCacheSize()':\n")
+		TestCheckEffectiveCacheSize()
 		klog.Info("\n========================\n")
 	},
 }
@@ -43,6 +43,6 @@ var PgCmdTestSharedBuffers = &cobra.Command{
 	Long:  `Test postgres cmd`,
 	Run: func(cmd *cobra.Command, args []string) {
 		klog.Info("Testing `TestSharedBuffers()`:\n")
-		TestSharedBuffers()
+		TestCheckAvailableSharedBuffers()
 	},
 }

@@ -67,35 +67,7 @@ func TestClientFuncs() {
 	klog.Infof("pgClient.DB.Stats().InUse : %d", pgClient.DB.Stats().InUse)
 }
 
-func TestSharedBuffers() {
-	kubeClient, err := utils.GetKBClient()
-	if err != nil {
-		klog.Error(err, "failed to get kube client")
-		return
-	}
-
-	db, err := GetPostgresDB(kubeClient)
-	if err != nil {
-		klog.Error(err, "failed to get postgres db")
-		return
-	}
-
-	pgClient, err := GetPostgresClient(kubeClient, db)
-	if err != nil {
-		klog.Error(err, "failed to get postgres client")
-		return
-	}
-
-	var sharedBuffers string
-	if err = pgClient.DB.QueryRow("SHOW shared_buffers").Scan(&sharedBuffers); err != nil {
-		klog.Error(err, "failed to get shared buffers")
-		return
-	}
-
-	klog.Infof("Shared buffers: %s\n", sharedBuffers)
-}
-
-func TestGetMaxAllowedMemory() {
+func TestCheckAvailableSharedBuffers() {
 	kubeClient, err := utils.GetKBClient()
 	if err != nil {
 		klog.Error(err, "failed to get kube client")
@@ -136,4 +108,47 @@ func TestGetMaxAllowedMemory() {
 
 	percentage := float64(sharedBuffers) / float64(totalMemory)
 	klog.Infof("Shared buffers percentage: %.2f%%\n", percentage*float64(100))
+}
+
+func TestCheckEffectiveCacheSize() {
+	kubeClient, err := utils.GetKBClient()
+	if err != nil {
+		klog.Error(err, "failed to get kube client")
+		return
+	}
+
+	db, err := GetPostgresDB(kubeClient)
+	if err != nil {
+		klog.Error(err, "failed to get postgres db")
+		return
+	}
+
+	pgClient, err := GetPostgresClient(kubeClient, db)
+	if err != nil {
+		klog.Error(err, "failed to get postgres client")
+		return
+	}
+
+	totalMemory, err := GetTotalMemory(pgClient, db)
+	if err != nil {
+		klog.Error(err, "failed to get total memory")
+		return
+	}
+
+	effectiveCacheSizeStr, err := GetEffectiveCacheSize(pgClient)
+	if err != nil {
+		klog.Error(err, "failed to get shared buffers")
+		return
+	}
+
+	effectiveCacheSize, err := gohumanize.ParseBytes(effectiveCacheSizeStr)
+	if err != nil {
+		klog.Error(err, "failed to parse shared buffers")
+		return
+	}
+	klog.Infof("Total memory: %s\n", gohumanize.IBytes(uint64(totalMemory)))
+	klog.Infof("effective cache size: %s\n", gohumanize.IBytes(uint64(effectiveCacheSize)))
+
+	percentage := float64(effectiveCacheSize) / float64(totalMemory)
+	klog.Infof("effective cache size percentage: %.2f%%\n", percentage*float64(100))
 }

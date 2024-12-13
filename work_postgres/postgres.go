@@ -12,8 +12,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	corev1 "k8s.io/api/core/v1"
 	kmapi "kmodules.xyz/client-go/api/v1"
-
+	"kubedb.dev/apimachinery/apis/kubedb"
 	dbapi "kubedb.dev/apimachinery/apis/kubedb/v1"
 	"kubedb.dev/db-client-go/postgres"
 )
@@ -23,11 +24,6 @@ func PrimaryServiceDNS(db *dbapi.Postgres) string {
 }
 
 func GetPostgresClient(kbClient client.Client, db *dbapi.Postgres) (*postgres.Client, error) {
-	kbClient, err := utils.GetKBClient()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get k8s client: %w", err)
-	}
-
 	kubeDBClient, err := postgres.NewKubeDBClientBuilder(kbClient, db).
 		WithContext(context.Background()).
 		WithURL(PrimaryServiceDNS(db)).
@@ -71,13 +67,20 @@ func GetTotalMemory(postgresClient *postgres.Client, db *dbapi.Postgres) (int64,
 	}
 
 	totalMemory := int64(0)
+	var pgContainer *corev1.Container
 	for _, v := range db.Spec.PodTemplate.Spec.Containers {
-		if v.Name != "postgres" {
-			continue
+		if v.Name == kubedb.PostgresContainerName {
+			pgContainer = &v
+			break
 		}
-		if qv, exists := v.Resources.Requests["memory"]; exists {
-			totalMemory += int64(qv.Value())
-		}
+	}
+
+	if pgContainer == nil {
+		return 0, fmt.Errorf("postgres container not found")
+	}
+
+	if qv, exists := pgContainer.Resources.Requests["memory"]; exists {
+		totalMemory += int64(qv.Value())
 	}
 
 	return totalMemory, nil
@@ -89,4 +92,12 @@ func GetSharedBuffers(postgresClient *postgres.Client) (string, error) {
 		return "", fmt.Errorf("failed to get shared buffers: %w", err)
 	}
 	return sharedBuffers, nil
+}
+
+func GetEffectiveCacheSize(postgresClient *postgres.Client) (string, error) {
+	var effectiveCacheSize string
+	if err := postgresClient.DB.QueryRow("SHOW effective_cache_size").Scan(&effectiveCacheSize); err != nil {
+		return "", fmt.Errorf("failed to get effective cache size: %w", err)
+	}
+	return effectiveCacheSize, nil
 }
